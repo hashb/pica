@@ -26,6 +26,8 @@ enum DeletedFolderCleaner {
         var trashed = 0
         var removed = 0
         var failures: [String] = []
+        /// Items that were trashed or removed.
+        var done: [URL] = []
     }
 
     /// Top-level, non-hidden entries of the folder.
@@ -34,10 +36,13 @@ enum DeletedFolderCleaner {
         guard let urls = try? FileManager.default.contentsOfDirectory(
             at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]
         ) else { return [] }
-        return urls.map { url in
-            let v = try? url.resourceValues(forKeys: Set(keys))
-            return Item(url: url, isNetwork: v?.volumeIsLocal == false, size: size(of: url, v))
-        }
+        return urls.map(item(for:))
+    }
+
+    static func item(for url: URL) -> Item {
+        let keys: Set<URLResourceKey> = [.volumeIsLocalKey, .isDirectoryKey, .fileSizeKey]
+        let v = try? url.resourceValues(forKeys: keys)
+        return Item(url: url, isNetwork: v?.volumeIsLocal == false, size: size(of: url, v))
     }
 
     private static func size(of url: URL, _ v: URLResourceValues?) -> Int64 {
@@ -59,9 +64,11 @@ enum DeletedFolderCleaner {
                 if item.isNetwork {
                     try fm.removeItem(at: item.url)
                     result.removed += 1
+                    result.done.append(item.url)
                 } else {
                     try fm.trashItem(at: item.url, resultingItemURL: nil)
                     result.trashed += 1
+                    result.done.append(item.url)
                 }
             } catch {
                 result.failures.append("\(item.url.lastPathComponent): \(error.localizedDescription)")
@@ -73,17 +80,23 @@ enum DeletedFolderCleaner {
     /// Text for the quit prompt.
     static func message(for items: [Item]) -> String {
         let total = Format.bytes(items.reduce(0) { $0 + $1.size })
+        let one = items.count == 1
+        let head = "There \(one ? "is" : "are") \(Library.count(items.count)) (\(total)) in your Deleted folder."
+        return "\(head) \(consequence(for: items))"
+    }
+
+    /// What will happen to the items: Trash for local files, permanent deletion on network storage.
+    static func consequence(for items: [Item]) -> String {
         let network = items.filter(\.isNetwork).count
         let local = items.count - network
         let one = items.count == 1
-        let head = "There \(one ? "is" : "are") \(Library.count(items.count)) (\(total)) in your Deleted folder."
         if network == 0 {
-            return "\(head) \(one ? "It" : "They")'ll be moved to the Trash."
+            return "\(one ? "It" : "They")'ll be moved to the Trash."
         }
         if local == 0 {
-            return "\(head) \(one ? "It's" : "They're") on network storage, which has no Trash, so \(one ? "it" : "they")'ll be deleted permanently. This can't be undone."
+            return "\(one ? "It's" : "They're") on network storage, which has no Trash, so \(one ? "it" : "they")'ll be deleted permanently. This can't be undone."
         }
-        return "\(head) \(Library.count(local)) will be moved to the Trash. \(Library.count(network)) on network storage, which has no Trash, will be deleted permanently. This can't be undone."
+        return "\(Library.count(local)) will be moved to the Trash. \(Library.count(network)) on network storage, which has no Trash, will be deleted permanently. This can't be undone."
     }
 
     /// True when macOS is quitting us for logout, restart or shutdown; we never prompt then.

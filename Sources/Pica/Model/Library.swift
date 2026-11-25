@@ -55,7 +55,14 @@ final class Library {
             rebuildTree()
         }
     }
+    /// Sidebar folders: the roots that contain photos or videos (empty ones are hidden).
     private(set) var rootNodes: [FolderNode] = []
+    /// How many added folders are hidden because they have no media.
+    private(set) var hiddenRootCount = 0
+    /// Bumped whenever the tree is re-checked, so the sidebar re-reads folder children.
+    private(set) var treeVersion = 0
+    @ObservationIgnored private var treeTask: Task<Void, Never>?
+    @ObservationIgnored private var newlyAddedRoot: URL?
 
     var deletedFolder: URL {
         didSet { Prefs.d.set(deletedFolder.path, forKey: Prefs.Key.deletedFolder); rebuildTree() }
@@ -152,7 +159,10 @@ final class Library {
         sortAscending = d.bool(forKey: Prefs.Key.sortAscending)
         filter = MediaFilter(rawValue: d.string(forKey: Prefs.Key.filter) ?? "") ?? .all
         showFilmstrip = d.bool(forKey: Prefs.Key.showFilmstrip)
-        rootNodes = roots.map(FolderNode.init)
+        DispatchQueue.main.async { [weak self] in self?.rebuildTree() }
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.rebuildTree() }
+        }
         if let p = d.string(forKey: Prefs.Key.selectedFolder), FileManager.default.fileExists(atPath: p) {
             selectedFolder = URL.folder(p)
             DispatchQueue.main.async { [weak self] in
@@ -183,6 +193,7 @@ final class Library {
 
     func isFavorite(_ url: URL) -> Bool { url.isDescendant(of: favoritesFolder) }
     func isInDeleted(_ url: URL) -> Bool { url.isDescendant(of: deletedFolder) }
+    var isViewingDeleted: Bool { selectedFolder == deletedFolder }
     func origin(of url: URL) -> URL? {
         XAttr.get(Self.originAttribute, at: url).map { URL(fileURLWithPath: $0) }
     }
@@ -192,7 +203,10 @@ final class Library {
 
     func addRoot(_ url: URL, select: Bool = true) {
         let folder = url.folderURL
-        if !roots.contains(folder) { roots.append(folder) }
+        if !roots.contains(folder) {
+            newlyAddedRoot = folder
+            roots.append(folder)
+        }
         if select { selectedFolder = folder }
     }
 
@@ -204,7 +218,35 @@ final class Library {
         }
     }
 
-    func rebuildTree() { rootNodes = roots.map(FolderNode.init) }
+    /// Rebuilds the sidebar tree in the background, leaving out folders without media.
+    func rebuildTree() {
+        let roots = self.roots
+        let excluded = [deletedFolder, favoritesFolder]
+        treeTask?.cancel()
+        treeTask = Task { [weak self] in
+            let visible = await Task.detached(priority: .utility) {
+                roots.filter { MediaPresence.containsMedia($0, excluding: excluded) }
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            // Reuse existing nodes so the sidebar keeps its selection and expanded folders.
+            let existing = Dictionary(uniqueKeysWithValues: self.rootNodes
+                .filter { $0.excluded == excluded }
+                .map { ($0.url, $0) })
+            let nodes = visible.map { existing[$0] ?? FolderNode(url: $0, excluded: excluded) }
+            nodes.forEach { $0.invalidate() }
+            if nodes.map(\.url) != self.rootNodes.map(\.url) || nodes.contains(where: { existing[$0.url] == nil }) {
+                self.rootNodes = nodes
+            }
+            if self.hiddenRootCount != roots.count - visible.count { self.hiddenRootCount = roots.count - visible.count }
+            self.treeVersion += 1
+            if let added = self.newlyAddedRoot {
+                self.newlyAddedRoot = nil
+                if !visible.contains(added) {
+                    self.toast = Toast(message: "“\(FileManager.default.displayName(atPath: added.path))” has no photos or videos yet, so it's hidden from the sidebar")
+                }
+            }
+        }
+    }
 
     func addFolderWithPanel() {
         let panel = NSOpenPanel()
@@ -293,6 +335,7 @@ final class Library {
             self.isScanning = false
             self.apply()
             self.handlePending()
+            self.rebuildTree()
         }
     }
 
@@ -420,7 +463,11 @@ final class Library {
     }
 
     func selectAll() { selection = Set(items.map(\.url)) }
-    func clearSelection() { selection = [] }
+    func clearSelection() {
+        selection = []
+        // Clicking empty grid space should give the grid the keyboard, not leave it with the sidebar.
+        resignSidebarFocus()
+    }
 
     func openViewer(at url: URL? = nil) {
         if let url { focus(url) }
@@ -465,11 +512,11 @@ final class Library {
 
     // MARK: Actions
 
-    /// In the viewer: the current item. In the grid: the selection (or the focused item).
+    /// In the viewer: the current item. In the grid: the selected items only, so nothing
+    /// happens when the selection has been cleared.
     var actionTargets: [URL] {
         if viewerOpen { return currentItem.map { [$0.url] } ?? [] }
-        if !selection.isEmpty { return items.filter { selection.contains($0.url) }.map(\.url) }
-        return currentItem.map { [$0.url] } ?? []
+        return items.filter { selection.contains($0.url) }.map(\.url)
     }
 
     func deleteTargets() {
@@ -550,6 +597,7 @@ final class Library {
             if undoStack.count > 100 { undoStack.removeFirst() }
         }
         removeFromView(Set(records.map(\.from)), preferIndex: firstIndex)
+        rebuildTree()
         if let e = errors.first {
             toast = Toast(message: errors.count == 1 ? "Couldn't move \(e)" : "Couldn't move \(errors.count) items. \(e)", isError: true)
         } else if !records.isEmpty {
@@ -557,20 +605,53 @@ final class Library {
         }
     }
 
+    /// Items already in the Deleted folder: confirm, then move them to the Trash
+    /// (permanently delete those on network storage, which has no Trash).
     private func moveToSystemTrash(_ urls: [URL]) {
-        let alert = NSAlert()
-        alert.messageText = "Move \(Self.count(urls.count)) to the Trash?"
-        alert.informativeText = "These items are already in your Deleted folder. They will be moved to the macOS Trash."
-        alert.addButton(withTitle: "Move to Trash")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let firstIndex = urls.compactMap { indexByURL[$0] }.min()
-        var trashed: Set<URL> = []
-        for url in urls {
-            if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) != nil { trashed.insert(url) }
+        let items = urls.map(DeletedFolderCleaner.item(for:))
+        confirmAndTrash(items, title: "Move \(Self.count(items.count)) to the Trash?")
+    }
+
+    /// "Move All to Trash" in the Deleted collection.
+    func trashAllDeleted() {
+        let items = DeletedFolderCleaner.items(in: deletedFolder)
+        guard !items.isEmpty else {
+            toast = Toast(message: "The Deleted folder is already empty")
+            return
         }
-        removeFromView(trashed, preferIndex: firstIndex)
-        toast = Toast(message: "Moved \(Self.count(trashed.count)) to the Trash")
+        let size = Format.bytes(items.reduce(0) { $0 + $1.size })
+        confirmAndTrash(items, title: "Move everything in Deleted to the Trash?", detail: "\(Self.count(items.count)) (\(size)).")
+    }
+
+    private func confirmAndTrash(_ items: [DeletedFolderCleaner.Item], title: String, detail: String? = nil) {
+        guard !items.isEmpty else { return }
+        let network = items.contains(where: \.isNetwork)
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = [detail, DeletedFolderCleaner.consequence(for: items)].compactMap { $0 }.joined(separator: " ")
+        alert.alertStyle = network ? .critical : .warning
+        let ok = alert.addButton(withTitle: network ? "Delete" : "Move to Trash")
+        ok.hasDestructiveAction = network
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let firstIndex = items.compactMap { indexByURL[$0.url.fileURL] }.min()
+        if let current = currentItem, items.contains(where: { $0.url.fileURL == current.url }) { video.stop() }
+        Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) { DeletedFolderCleaner.empty(items) }.value
+            guard let self else { return }
+            self.removeFromView(Set(result.done.map(\.fileURL)), preferIndex: firstIndex)
+            self.rescan()
+            self.rebuildTree()
+            if let first = result.failures.first {
+                self.toast = Toast(message: "Couldn't remove \(Self.count(result.failures.count)). \(first)", isError: true)
+            } else {
+                var parts: [String] = []
+                if result.trashed > 0 { parts.append("Moved \(Self.count(result.trashed)) to the Trash") }
+                if result.removed > 0 { parts.append("Permanently deleted \(Self.count(result.removed))") }
+                self.toast = Toast(message: parts.joined(separator: " · "))
+            }
+        }
     }
 
     private func removeFromView(_ urls: Set<URL>, preferIndex: Int?) {

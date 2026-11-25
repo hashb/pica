@@ -224,3 +224,49 @@ final class EmptyDeletedTests: XCTestCase {
         XCTAssertTrue(msg.contains("1 item will be moved to the Trash") && msg.contains("deleted permanently"), msg)
     }
 }
+
+final class SidebarTreeTests: XCTestCase {
+    func testFoldersWithoutMediaAreHidden() throws {
+        let fm = FileManager.default
+        let root = Fixtures.dir.appendingPathComponent("tree", isDirectory: true)
+        try? fm.removeItem(at: root)
+        func file(_ path: String) throws {
+            let u = root.appendingPathComponent(path)
+            try fm.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data([1]).write(to: u)
+        }
+        func dir(_ path: String) throws {
+            try fm.createDirectory(at: root.appendingPathComponent(path), withIntermediateDirectories: true)
+        }
+        try file("trip/day1/a.jpg")          // media two levels down
+        try dir("empty")                      // nothing at all
+        try file("docs/notes.txt")            // files, but no media
+        try file("videos/clip.mkv")
+        try file("Pica/Deleted/gone.jpg")     // only media is in an excluded folder
+        try file("Pica/Favorites/fav.jpg")
+        let excluded = [root.appendingPathComponent("Pica/Deleted").folderURL,
+                        root.appendingPathComponent("Pica/Favorites").folderURL]
+
+        XCTAssertTrue(MediaPresence.containsMedia(root, excluding: excluded))
+        XCTAssertFalse(MediaPresence.containsMedia(root.appendingPathComponent("empty"), excluding: excluded))
+        XCTAssertFalse(MediaPresence.containsMedia(root.appendingPathComponent("docs"), excluding: excluded))
+        XCTAssertFalse(MediaPresence.containsMedia(root.appendingPathComponent("Pica"), excluding: excluded))
+
+        let names = FolderNode(url: root, excluded: excluded).children?.map(\.name) ?? []
+        XCTAssertEqual(names, ["trip", "videos"])
+        let trip = FolderNode(url: root.appendingPathComponent("trip"), excluded: excluded)
+        XCTAssertEqual(trip.children?.map(\.name), ["day1"])
+
+        // Once the last photo is gone, the folder disappears.
+        try fm.removeItem(at: root.appendingPathComponent("trip/day1/a.jpg"))
+        XCTAssertEqual(FolderNode(url: root, excluded: excluded).children?.map(\.name), ["videos"])
+    }
+
+    func testTrashPromptWording() {
+        let local = DeletedFolderCleaner.Item(url: URL(fileURLWithPath: "/x/a.jpg"), isNetwork: false, size: 10)
+        let net = DeletedFolderCleaner.Item(url: URL(fileURLWithPath: "/x/b.jpg"), isNetwork: true, size: 10)
+        XCTAssertEqual(DeletedFolderCleaner.consequence(for: [local]), "It'll be moved to the Trash.")
+        XCTAssertTrue(DeletedFolderCleaner.consequence(for: [net, net]).hasPrefix("They're on network storage"))
+        XCTAssertTrue(DeletedFolderCleaner.message(for: [local]).hasPrefix("There is 1 item"))
+    }
+}

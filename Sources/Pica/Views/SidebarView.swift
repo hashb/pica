@@ -5,6 +5,7 @@ struct SidebarView: View {
 
     var body: some View {
         @Bindable var library = library
+        let _ = library.treeVersion  // re-read folder children after a refresh
         List(selection: $library.selectedFolder) {
             Section("Collections") {
                 Label {
@@ -29,6 +30,10 @@ struct SidebarView: View {
             Section("Folders") {
                 if library.roots.isEmpty {
                     Text("Add a folder to get started")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                } else if library.rootNodes.isEmpty && library.hiddenRootCount > 0 {
+                    Text("No folders with photos or videos")
                         .foregroundStyle(.secondary)
                         .font(.callout)
                 }

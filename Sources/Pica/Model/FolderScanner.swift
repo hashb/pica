@@ -85,26 +85,85 @@ final class FolderWatcher {
     }
 }
 
-/// Lazily-expanded folder tree for the sidebar.
+/// Answers "does this folder (or anything under it) contain a photo or video?", stopping at the first one.
+enum MediaPresence {
+    /// Folders bigger than this are assumed to contain media rather than walked completely.
+    static let scanLimit = 20_000
+
+    static func containsMedia(_ folder: URL, excluding: [URL]) -> Bool {
+        let excludedPaths = Set(excluding.map { $0.standardizedFileURL.path })
+        if excludedPaths.contains(folder.standardizedFileURL.path) { return false }
+        guard let e = FileManager.default.enumerator(
+            at: folder, includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return false }
+        var seen = 0
+        while let url = e.nextObject() as? URL {
+            seen += 1
+            if seen > scanLimit { return true }
+            // Cheap extension check first; only touch the disk for likely media.
+            if MediaFormats.kind(for: url) != nil,
+               (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
+                return true
+            }
+            if !excludedPaths.isEmpty, excludedPaths.contains(url.standardizedFileURL.path) {
+                e.skipDescendants()
+            }
+        }
+        return false
+    }
+}
+
+/// Lazily-expanded folder tree for the sidebar. Folders with no photos or videos anywhere
+/// inside them are left out, as are the Favorites/Deleted folders (shown as collections).
+///
+/// Nodes keep their identity across refreshes (children are reused by URL), so the sidebar's
+/// selection and expansion state aren't disturbed when the tree is re-checked.
 final class FolderNode: Identifiable, Hashable {
     let url: URL
+    let excluded: [URL]
     var id: URL { url }
     var name: String { FileManager.default.displayName(atPath: url.path) }
 
-    init(url: URL) { self.url = url.folderURL }
+    private var cached: [FolderNode]??
 
-    lazy var children: [FolderNode]? = {
+    init(url: URL, excluded: [URL] = []) {
+        self.url = url.folderURL
+        self.excluded = excluded
+    }
+
+    var children: [FolderNode]? {
+        if let cached { return cached }
+        let fresh = loadChildren()
+        cached = .some(fresh)
+        return fresh
+    }
+
+    /// Re-check this subtree next time it's shown, keeping existing child nodes where possible.
+    func invalidate() {
+        if case .some(let kids?) = cached { kids.forEach { $0.invalidate() } }
+        previous = Dictionary(uniqueKeysWithValues: ((cached ?? nil) ?? []).map { ($0.url, $0) })
+        cached = nil
+    }
+
+    private var previous: [URL: FolderNode] = [:]
+
+    private func loadChildren() -> [FolderNode]? {
         let keys: [URLResourceKey] = [.isDirectoryKey, .isPackageKey]
         guard let urls = try? FileManager.default.contentsOfDirectory(
             at: url, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]
         ) else { return nil }
+        let excludedURLs = excluded.map(\.folderURL)
         let dirs = urls.filter { u in
             let v = try? u.resourceValues(forKeys: Set(keys))
-            return v?.isDirectory == true && v?.isPackage != true
+            guard v?.isDirectory == true, v?.isPackage != true else { return false }
+            return !excludedURLs.contains(u.folderURL) && MediaPresence.containsMedia(u, excluding: excluded)
         }
+        .map(\.folderURL)
         .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-        return dirs.isEmpty ? nil : dirs.map(FolderNode.init)
-    }()
+        defer { previous = [:] }
+        return dirs.isEmpty ? nil : dirs.map { previous[$0] ?? FolderNode(url: $0, excluded: excluded) }
+    }
 
     static func == (a: FolderNode, b: FolderNode) -> Bool { a.url == b.url }
     func hash(into h: inout Hasher) { h.combine(url) }

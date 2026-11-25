@@ -24,6 +24,11 @@ struct BrowserView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if library.isViewingDeleted && !library.allItems.isEmpty {
+                DeletedBanner()
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) { StatusBar() }
         .searchable(text: $library.searchText, placement: .toolbar, prompt: "Filter by name")
         .toolbar {
@@ -74,9 +79,10 @@ struct BrowserView: View {
                 Button {
                     library.deleteTargets()
                 } label: {
-                    Label("Delete", systemImage: "trash")
+                    Label(library.isViewingDeleted ? "Move to Trash" : "Delete",
+                          systemImage: library.isViewingDeleted ? "trash.slash" : "trash")
                 }
-                .help("Move to the Deleted folder (⌫)")
+                .help(library.isViewingDeleted ? "Move the selected items to the macOS Trash (⌫)" : "Move to the Deleted folder (⌫)")
                 .disabled(library.actionTargets.isEmpty)
             }
         }
@@ -123,12 +129,12 @@ struct MediaGridView: View {
                         }
                     }
                     .padding(padding)
+                    // Fill the visible area so clicks on empty space land here (the scroll
+                    // view itself swallows them): they clear the selection and focus the grid.
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .top)
+                    .contentShape(Rectangle())
+                    .onTapGesture { library.clearSelection() }
                 }
-                .background(
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture { library.clearSelection() }
-                )
                 .onAppear {
                     library.gridColumns = cols
                     if let f = library.focused { proxy.scrollTo(f, anchor: .center) }
@@ -274,6 +280,34 @@ struct ItemContextMenu: View {
             library.prepareContextTarget(item.url)
             library.copyTargetPaths()
         }
+    }
+}
+
+/// Shown at the top of the Deleted collection.
+struct DeletedBanner: View {
+    @Environment(Library.self) private var library
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "trash")
+                .foregroundStyle(.secondary)
+            Text("Deleted items stay here until you move them to the Trash. Press R to restore one.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer()
+            Button {
+                library.trashAllDeleted()
+            } label: {
+                Label("Move All to Trash", systemImage: "trash.slash")
+            }
+            .controlSize(.regular)
+            .help("Move everything in the Deleted folder to the macOS Trash (items on network storage are deleted permanently)")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
     }
 }
 
