@@ -85,12 +85,25 @@ struct HoldButton: View {
     }
 }
 
+/// Small notice in the bottom-right corner, kept off the photo: above the status bar in
+/// the grid; in the viewer it sits at the right end of the filmstrip row (or, with the
+/// filmstrip hidden, in the corner, above the video controls), left of the info panel.
 struct ToastView: View {
     @Environment(Library.self) private var library
 
+    private var bottomInset: CGFloat {
+        guard library.viewerOpen else { return 34 }
+        if library.showFilmstrip { return 25 }   // vertically centred in the 84-pt filmstrip row
+        return library.currentItem?.kind == .video ? 110 : 14
+    }
+
+    private var trailingInset: CGFloat {
+        library.viewerOpen && library.showInfo ? 290 + 14 : 14
+    }
+
     var body: some View {
         if let toast = library.toast {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: toast.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     .foregroundStyle(toast.isError ? .yellow : .green)
                 Text(toast.message)
@@ -101,12 +114,15 @@ struct ToastView: View {
                         .fontWeight(.semibold)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .font(.callout)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
             .background(.regularMaterial, in: Capsule())
-            .shadow(color: .black.opacity(0.25), radius: 10, y: 3)
-            .padding(24)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+            .frame(maxWidth: 420, alignment: .trailing)
+            .padding(.trailing, trailingInset)
+            .padding(.bottom, bottomInset)
+            .transition(.move(edge: .trailing).combined(with: .opacity))
             .task(id: toast.id) {
                 try? await Task.sleep(for: .seconds(toast.canUndo ? 5 : 3.5))
                 if library.toast?.id == toast.id {

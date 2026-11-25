@@ -39,10 +39,9 @@ struct ViewerView: View {
             }
         }
         .background(ViewerBackdrop().ignoresSafeArea())
-        .overlay(alignment: .top) {
+        .overlay(alignment: .bottomTrailing) {
             if isOverlay {
                 ToastView()
-                    .padding(.top, 40)
                     .animation(.spring(duration: 0.3), value: library.toast)
             }
         }

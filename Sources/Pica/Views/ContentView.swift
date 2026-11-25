@@ -31,7 +31,7 @@ struct ContentView: View {
             window.isRestorable = false
             updateWindowTranslucency()
         })
-        .overlay(alignment: library.viewerOpen ? .top : .bottom) {
+        .overlay(alignment: .bottomTrailing) {
             ToastView()
                 .animation(.spring(duration: 0.3), value: library.toast)
         }
