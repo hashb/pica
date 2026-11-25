@@ -136,6 +136,8 @@ final class Library {
     @ObservationIgnored private var watcher: FolderWatcher?
     @ObservationIgnored private var pendingFocus: URL?
     @ObservationIgnored private var pendingOpenViewer = false
+    /// After the next scan, open the viewer on the folder's first image.
+    @ObservationIgnored private var pendingOpenFirst = false
 
     init() {
         Prefs.registerDefaults()
@@ -247,6 +249,28 @@ final class Library {
         }
     }
 
+    /// "Explore with Pica": a folder opens in the viewer at its first image (or first video if it
+    /// has no images); a file opens its folder, starting at that file.
+    func explore(_ url: URL) {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return }
+        guard isDir.boolValue else {
+            open(urls: [url])
+            return
+        }
+        let folder = url.folderURL
+        if !roots.contains(where: { folder.isSameOrDescendant(of: $0) }) { roots.append(folder) }
+        filter = .all
+        searchText = ""
+        pendingFocus = nil
+        pendingOpenFirst = true
+        if selectedFolder != folder {
+            selectedFolder = folder
+        } else {
+            rescan()
+        }
+    }
+
     // MARK: Scanning
 
     func rescan() {
@@ -281,6 +305,15 @@ final class Library {
     }
 
     private func handlePending() {
+        if pendingOpenFirst {
+            pendingOpenFirst = false
+            if let first = items.first(where: { $0.kind == .image }) ?? items.first {
+                focus(first.url)
+                viewerOpen = true
+            } else {
+                toast = Toast(message: "No photos or videos in this folder")
+            }
+        }
         if let p = pendingFocus, indexByURL[p] != nil {
             focus(p)
             if pendingOpenViewer { viewerOpen = true }

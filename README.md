@@ -9,12 +9,15 @@ scripts/build-app.sh          # builds build/Pica.app (release)
 open build/Pica.app
 ```
 
+To install it, copy `build/Pica.app` to `/Applications` or `~/Applications` and open it once. If "Explore with Pica" doesn't show up in Finder's right-click menu, run `/System/Library/CoreServices/pbs -update` (or log out and back in).
+
 You can also run `swift run Pica ~/Pictures` during development, and `swift test` runs the tests.
 
 To make video formats that macOS can't play work, install ffmpeg (`brew install ffmpeg`). Pica finds it in Homebrew, MacPorts, Nix or your login shell's `PATH`, or you can set its path in Settings.
 
 ## Features
 
+- **Explore with Pica**: right-click a folder in Finder and choose Services → Explore with Pica. Pica opens the folder full screen at its first image (or its first video if it has no images). On a photo or video, it opens the file's folder starting at that file. You can give it a keyboard shortcut in System Settings → Keyboard → Keyboard Shortcuts → Services.
 - **Library sidebar**: add folders (or drop them on the window) and browse their subfolders. The sidebar also has **Favorites** and **Deleted** collections.
 - **Thumbnail grid**: thumbnails load asynchronously and are cached, with duration badges on videos. Filter by All / Photos / Videos, filter by name, sort by name, date, size or type, optionally include subfolders, and resize thumbnails. The folder refreshes on its own when files change on disk.
 - **Viewer**: like Picasa's photo viewer, it opens over the whole screen, with everything behind the photo dimmed and showing through. The menu bar and Dock hide; `Esc` closes it. In Settings you can choose Translucent, Blurred or Black and set how dark it is, or open the viewer inside the window instead. Also: fit / actual size / zoom (pinch, ⌘-scroll, double-click, `+` `-` `0` `1`), drag to pan, animated GIF/WebP/APNG, a filmstrip, and an info panel with EXIF (camera, lens, exposure, GPS) and video details. Neighbouring images are prefetched, so going next/previous is instant.

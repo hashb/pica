@@ -28,7 +28,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Privacy.purge()
     }
 
+    private var services: ServiceProvider?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let provider = ServiceProvider()
+        services = provider
+        NSApp.servicesProvider = provider
+        NSUpdateDynamicServices()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         KeyboardRouter.shared.install()
@@ -111,6 +117,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+/// Handles the "Explore with Pica" service in Finder's right-click menu (declared in Info.plist).
+@MainActor
+final class ServiceProvider: NSObject {
+    @objc func exploreWithPica(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        let urls = pboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        guard let first = urls.first else {
+            error.pointee = "Pica didn't receive a file or folder." as NSString
+            return
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        Library.shared.explore(first)
+    }
 }
 
 struct PicaCommands: Commands {
