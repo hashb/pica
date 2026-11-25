@@ -2,12 +2,18 @@
 
 A fast, Picasa/Pixea-style photo and video viewer for macOS (14+), written in Swift and SwiftUI with AppKit and AVFoundation underneath. There's no editing. Pica is for browsing, viewing and triaging: **favorite** or **delete** each item, and it moves the file into a folder you choose.
 
+## Download
+
+Get the latest notarized build from [Releases](https://github.com/hashb/pica/releases): unzip it and move **Pica.app** to Applications.
+
 ## Build & run
 
 ```bash
 scripts/build-app.sh          # builds build/Pica.app (release)
 open build/Pica.app
 ```
+
+To make a signed, notarized release zip, run `scripts/release.sh`. It needs a Developer ID Application certificate and a notarytool keychain profile (`NOTARY_PROFILE=<name>`, default `pica-notary`); setup steps are at the top of the script.
 
 To install it, copy `build/Pica.app` to `/Applications` or `~/Applications` and open it once. If "Explore with Pica" doesn't show up in Finder's right-click menu, run `/System/Library/CoreServices/pbs -update` (or log out and back in).
 

@@ -4,65 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
-	<key>CFBundleExecutable</key>
-	<string>Pica</string>
-	<key>CFBundleIdentifier</key>
-	<string>local.pica.viewer</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>Pica</string>
 	<key>CFBundleDisplayName</key>
 	<string>Pica</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>14.0</string>
-	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.photography</string>
-	<key>NSHighResolutionCapable</key>
-	<true/>
-	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
-	<key>NSDesktopFolderUsageDescription</key>
-	<string>Pica shows the photos and videos in folders you choose.</string>
-	<key>NSDocumentsFolderUsageDescription</key>
-	<string>Pica shows the photos and videos in folders you choose.</string>
-	<key>NSDownloadsFolderUsageDescription</key>
-	<string>Pica shows the photos and videos in folders you choose.</string>
-	<key>NSRemovableVolumesUsageDescription</key>
-	<string>Pica shows the photos and videos on drives you choose.</string>
-	<key>NSNetworkVolumesUsageDescription</key>
-	<string>Pica shows the photos and videos on network drives you choose.</string>
-	<key>NSServices</key>
-	<array>
-		<dict>
-			<key>NSMenuItem</key>
-			<dict>
-				<key>default</key>
-				<string>Explore with Pica</string>
-			</dict>
-			<key>NSMessage</key>
-			<string>exploreWithPica</string>
-			<key>NSPortName</key>
-			<string>Pica</string>
-			<key>NSRequiredContext</key>
-			<dict/>
-			<key>NSSendFileTypes</key>
-			<array>
-				<string>public.folder</string>
-				<string>public.image</string>
-				<string>public.movie</string>
-				<string>public.audiovisual-content</string>
-			</array>
-		</dict>
-	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -103,18 +46,86 @@
 			</array>
 		</dict>
 		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>mkv</string>
+				<string>webm</string>
+				<string>avi</string>
+				<string>wmv</string>
+				<string>flv</string>
+				<string>ts</string>
+				<string>mts</string>
+				<string>m2ts</string>
+				<string>ogv</string>
+				<string>vob</string>
+				<string>mpg</string>
+				<string>mpeg</string>
+				<string>rmvb</string>
+				<string>divx</string>
+				<string>3gp</string>
+			</array>
 			<key>CFBundleTypeName</key>
 			<string>Other Video</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>
 			<string>Alternate</string>
-			<key>CFBundleTypeExtensions</key>
+		</dict>
+	</array>
+	<key>CFBundleExecutable</key>
+	<string>Pica</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>local.pica.viewer</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Pica</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.photography</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Pica shows the photos and videos in folders you choose.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Pica shows the photos and videos in folders you choose.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Pica shows the photos and videos in folders you choose.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Pica shows the photos and videos on network drives you choose.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Pica shows the photos and videos on drives you choose.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Explore with Pica</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>exploreWithPica</string>
+			<key>NSPortName</key>
+			<string>Pica</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
 			<array>
-				<string>mkv</string><string>webm</string><string>avi</string><string>wmv</string>
-				<string>flv</string><string>ts</string><string>mts</string><string>m2ts</string>
-				<string>ogv</string><string>vob</string><string>mpg</string><string>mpeg</string>
-				<string>rmvb</string><string>divx</string><string>3gp</string>
+				<string>public.folder</string>
+				<string>public.image</string>
+				<string>public.movie</string>
+				<string>public.audiovisual-content</string>
 			</array>
 		</dict>
 	</array>
