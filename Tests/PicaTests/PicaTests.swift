@@ -73,6 +73,23 @@ final class ScrubTests: XCTestCase {
         XCTAssertEqual(VideoPlayerController.scrubSpeed(heldFor: 20, base: 2, duration: 12), 4)
     }
 
+    func testSpeedUpCanBeTurnedOffAndCapped() {
+        let long = 3600.0
+        // No speed-up: stays at the starting speed however long it's held.
+        for held in [0.1, 2.0, 30.0] {
+            XCTAssertEqual(VideoPlayerController.scrubSpeed(heldFor: held, base: 3, accelerate: false, maxSpeed: 256, duration: long), 3)
+        }
+        // A lower top speed stops the doubling there.
+        XCTAssertEqual(VideoPlayerController.scrubSpeed(heldFor: 1.5, base: 2, maxSpeed: 16, duration: long), 8)
+        XCTAssertEqual(VideoPlayerController.scrubSpeed(heldFor: 30, base: 2, maxSpeed: 16, duration: long), 16)
+        // A higher top speed lets it keep doubling.
+        XCTAssertEqual(VideoPlayerController.scrubSpeed(heldFor: 30, base: 2, maxSpeed: 1024, duration: long), 1024)
+        // A top speed below the starting speed never slows it below the start.
+        XCTAssertEqual(VideoPlayerController.scrubSpeed(heldFor: 30, base: 8, maxSpeed: 4, duration: long), 8)
+        // The short-clip limit still applies.
+        XCTAssertEqual(VideoPlayerController.scrubSpeed(heldFor: 30, base: 2, maxSpeed: 1024, duration: 30), 10)
+    }
+
     @MainActor
     private func readyController(_ url: URL) async throws -> VideoPlayerController {
         let c = VideoPlayerController()

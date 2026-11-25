@@ -328,10 +328,17 @@ final class VideoPlayerController {
 
     /// Speed doubles the longer the button is held: base, 2×, 4×… up to 128× base,
     /// but never so fast that a short clip flies past in under ~3 seconds.
-    nonisolated static func scrubSpeed(heldFor held: Double, base: Double, duration: Double) -> Double {
-        let thresholds: [Double] = [0, 0.7, 1.4, 2.2, 3.2, 4.5, 6, 8]
-        let level = thresholds.lastIndex { held >= $0 } ?? 0
-        let speed = base * pow(2, Double(level))
+    /// With `accelerate`, the speed doubles about every second while held, up to `maxSpeed`;
+    /// without it, scrubbing stays at `base`. Either way a short clip is never crossed in
+    /// less than about 3 seconds.
+    nonisolated static func scrubSpeed(heldFor held: Double, base: Double, accelerate: Bool = true,
+                                       maxSpeed: Double = 256, duration: Double) -> Double {
+        var speed = base
+        if accelerate {
+            let thresholds: [Double] = [0, 0.7, 1.4, 2.2, 3.2, 4.5, 6, 8, 10, 12]
+            let level = thresholds.lastIndex { held >= $0 } ?? 0
+            speed = min(base * pow(2, Double(level)), max(maxSpeed, base))
+        }
         return min(speed, max(base, duration / 3))
     }
 
@@ -340,7 +347,9 @@ final class VideoPlayerController {
         let now = CACurrentMediaTime()
         let dt = min(now - lastTick, 0.1)
         lastTick = now
-        let speed = Self.scrubSpeed(heldFor: now - scrubStart, base: Prefs.scrubBaseSpeed, duration: duration)
+        let speed = Self.scrubSpeed(heldFor: now - scrubStart, base: Prefs.scrubBaseSpeed,
+                                    accelerate: Prefs.scrubAccelerate, maxSpeed: Prefs.scrubMaxSpeed,
+                                    duration: duration)
         if speed != scrubSpeed { scrubSpeed = speed }
         scrubTarget = max(0, min(duration, scrubTarget + Double(scrubDirection) * speed * dt))
         currentTime = scrubTarget

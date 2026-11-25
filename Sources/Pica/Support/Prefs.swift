@@ -11,6 +11,8 @@ enum Prefs {
         static let autoplay = "autoplayVideos"
         static let loop = "loopVideos"
         static let scrubSpeed = "scrubBaseSpeed"
+        static let scrubAccelerate = "scrubAccelerate"
+        static let scrubMaxSpeed = "scrubMaxSpeed"
         static let upscale = "upscaleSmallImages"
         static let showNames = "showFileNames"
         static let thumbSize = "thumbnailSize"
@@ -34,6 +36,8 @@ enum Prefs {
             Key.autoplay: true,
             Key.loop: false,
             Key.scrubSpeed: 2.0,
+            Key.scrubAccelerate: true,
+            Key.scrubMaxSpeed: 256.0,
             Key.upscale: false,
             Key.showNames: true,
             Key.thumbSize: 170.0,
@@ -75,6 +79,11 @@ enum Prefs {
         set { d.set(newValue.rawValue, forKey: Key.emptyDeletedOnQuit) }
     }
     static var scrubBaseSpeed: Double { max(0.5, d.double(forKey: Key.scrubSpeed)) }
+    /// Whether hold-to-scrub keeps doubling its speed while held.
+    static var scrubAccelerate: Bool { d.bool(forKey: Key.scrubAccelerate) }
+    /// The fastest hold-to-scrub may go when speeding up.
+    static var scrubMaxSpeed: Double { max(1, d.double(forKey: Key.scrubMaxSpeed)) }
+    static let scrubMaxSpeedChoices: [Double] = [4, 8, 16, 32, 64, 128, 256, 512, 1024]
 }
 
 /// How the viewer is drawn behind the photo or video.

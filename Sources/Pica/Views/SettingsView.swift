@@ -4,6 +4,8 @@ struct SettingsView: View {
     @Environment(Library.self) private var library
     @AppStorage(Prefs.Key.autoplay) private var autoplay = true
     @AppStorage(Prefs.Key.scrubSpeed) private var scrubSpeed = 2.0
+    @AppStorage(Prefs.Key.scrubAccelerate) private var scrubAccelerate = true
+    @AppStorage(Prefs.Key.scrubMaxSpeed) private var scrubMaxSpeed = 256.0
     @AppStorage(Prefs.Key.upscale) private var upscale = false
     @AppStorage(Prefs.Key.showNames) private var showNames = true
     @AppStorage(Prefs.Key.ffmpegPath) private var ffmpegPath = ""
@@ -82,14 +84,27 @@ struct SettingsView: View {
             Section("Playback") {
                 Toggle("Start playing videos automatically", isOn: $autoplay)
                 Toggle("Loop videos", isOn: $controller.loop)
-                VStack(alignment: .leading) {
-                    Slider(value: $scrubSpeed, in: 1...8, step: 1) {
-                        Text("Hold-to-scrub starting speed")
+            }
+            Section {
+                LabeledContent("Starting speed") {
+                    HStack {
+                        Slider(value: $scrubSpeed, in: 1...8, step: 1)
+                        Text("\(Int(scrubSpeed))×")
+                            .monospacedDigit()
+                            .frame(width: 32, alignment: .trailing)
                     }
-                    Text("Starts at \(Int(scrubSpeed))× and doubles every second or so while held (up to \(Int(scrubSpeed * 128))×).")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
+                Toggle("Speed up while held", isOn: $scrubAccelerate)
+                Picker("Top speed", selection: $scrubMaxSpeed) {
+                    ForEach(Prefs.scrubMaxSpeedChoices, id: \.self) { Text("\(Int($0))×").tag($0) }
+                }
+                .disabled(!scrubAccelerate)
+            } header: {
+                Text("Hold-to-scrub")
+            } footer: {
+                Text(scrubSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 TextField("ffmpeg path", text: $ffmpegPath, prompt: Text("Auto-detect"))
@@ -118,6 +133,19 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var scrubSummary: String {
+        let start = Int(scrubSpeed)
+        let body: String
+        if !scrubAccelerate {
+            body = "Holding the rewind/fast-forward buttons, J/L or ←/→ scrubs at a steady \(start)×."
+        } else if scrubMaxSpeed <= scrubSpeed {
+            body = "Holding the rewind/fast-forward buttons, J/L or ←/→ scrubs at \(start)× (the top speed isn't above the starting speed)."
+        } else {
+            body = "Holding the rewind/fast-forward buttons, J/L or ←/→ starts at \(start)× and doubles about every second, up to \(Int(scrubMaxSpeed))×."
+        }
+        return body + " Short clips are slowed down so they take at least about 3 seconds end to end."
     }
 
     private func folderRow(_ title: String, url: URL, set: @escaping (URL) -> Void) -> some View {

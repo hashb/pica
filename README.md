@@ -59,7 +59,7 @@ Pica does keep its settings, including the folders in the sidebar and the last f
 | `J` / `L` | scrub backward / forward | jump −5 s / +5 s |
 | `←` / `→` | scrub backward / forward | previous / next item |
 
-Scrubbing starts at 2× and speeds up while you hold: 4×, 8×, 16× … up to 256× on long videos. Short clips are capped so they don't fly past. A large on-screen display shows the direction, speed and position. The starting speed is set in Settings.
+Scrubbing starts at 2× and speeds up while you hold: 4×, 8×, 16× … up to 256× on long videos. Short clips are capped so they don't fly past. A large on-screen display shows the direction, speed and position. In Settings → Video → Hold-to-scrub you can set the starting speed, turn off the speed-up so it stays at that speed, and choose a top speed from 4× to 1024×.
 
 Other video keys: `Space`/`K` play/pause, `,` `.` previous/next frame, `M` mute, `↑`/`↓` previous/next item. The timeline slider can also be dragged. Playback speed and loop are in the control bar.
 
