@@ -40,7 +40,7 @@ struct PlayerSurface: NSViewRepresentable {
             super.init(frame: .zero)
             playerLayer.player = player
             playerLayer.videoGravity = .resizeAspect
-            playerLayer.backgroundColor = NSColor.black.cgColor
+            playerLayer.backgroundColor = NSColor.clear.cgColor
             wantsLayer = true
         }
 
@@ -153,6 +153,46 @@ struct ThumbnailImage: View {
                 if Task.isCancelled { return }
                 thumb = t
                 failed = t == nil
+            }
+        }
+    }
+}
+
+/// Wraps NSVisualEffectView.
+struct VisualEffectBackground: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .hudWindow
+    var blending: NSVisualEffectView.BlendingMode = .behindWindow
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.state = .active
+        v.material = material
+        v.blendingMode = blending
+        v.appearance = NSAppearance(named: .darkAqua)
+        return v
+    }
+
+    func updateNSView(_ v: NSVisualEffectView, context: Context) {
+        v.material = material
+        v.blendingMode = blending
+    }
+}
+
+/// Backdrop of the viewer: dimmed desktop, blurred desktop, or black.
+struct ViewerBackdrop: View {
+    @AppStorage(Prefs.Key.viewerBackground) private var style = ViewerBackground.translucent.rawValue
+    @AppStorage(Prefs.Key.viewerOpacity) private var opacity = 0.78
+
+    var body: some View {
+        switch ViewerBackground(rawValue: style) ?? .translucent {
+        case .black:
+            Color.black
+        case .translucent:
+            Color.black.opacity(opacity)
+        case .blurred:
+            ZStack {
+                VisualEffectBackground(material: .fullScreenUI)
+                Color.black.opacity(opacity * 0.6)
             }
         }
     }

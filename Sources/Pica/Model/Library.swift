@@ -113,7 +113,15 @@ final class Library {
     @ObservationIgnored private var anchor: URL?
     @ObservationIgnored private var lastFocusIndex = 0
 
-    var viewerOpen = false { didSet { if oldValue != viewerOpen { syncPlayback() } } }
+    var viewerOpen = false {
+        didSet {
+            guard oldValue != viewerOpen else { return }
+            if viewerOpen { viewerInOverlay = Prefs.viewerFullScreen }
+            syncPlayback()
+        }
+    }
+    /// Whether the open viewer is the full-screen overlay (decided each time it opens).
+    private(set) var viewerInOverlay = false
     var showInfo = false
     var showFilmstrip: Bool { didSet { Prefs.d.set(showFilmstrip, forKey: Prefs.Key.showFilmstrip) } }
     private(set) var isScanning = false

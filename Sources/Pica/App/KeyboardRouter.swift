@@ -7,6 +7,8 @@ final class KeyboardRouter {
     static let shared = KeyboardRouter()
 
     weak var mainWindow: NSWindow?
+    /// The full-screen viewer overlay, while it's shown.
+    weak var viewerWindow: NSWindow?
 
     private var monitor: Any?
     private var resignObserver: NSObjectProtocol?
@@ -44,7 +46,8 @@ final class KeyboardRouter {
     }
 
     private func handle(_ e: NSEvent) -> Bool {
-        guard let window = e.window, window === mainWindow, window.attachedSheet == nil else { return false }
+        guard let window = e.window, window === mainWindow || window === viewerWindow,
+              window.attachedSheet == nil else { return false }
         let lib = Library.shared
 
         if e.type == .keyUp { return handleKeyUp(e, lib) }

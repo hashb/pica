@@ -14,7 +14,10 @@ struct VideoStage: View {
                 .contentShape(Rectangle())
                 .gesture(
                     TapGesture(count: 2)
-                        .onEnded { KeyboardRouter.shared.mainWindow?.toggleFullScreen(nil) }
+                        .onEnded {
+                            // In the full-screen overlay there's nothing to toggle.
+                            if !ViewerOverlay.shared.isVisible { KeyboardRouter.shared.mainWindow?.toggleFullScreen(nil) }
+                        }
                         .exclusively(before: TapGesture().onEnded { controller.togglePlay() })
                 )
 

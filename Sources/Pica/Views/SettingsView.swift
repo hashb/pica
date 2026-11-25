@@ -7,6 +7,9 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.upscale) private var upscale = false
     @AppStorage(Prefs.Key.showNames) private var showNames = true
     @AppStorage(Prefs.Key.ffmpegPath) private var ffmpegPath = ""
+    @AppStorage(Prefs.Key.viewerBackground) private var viewerBackground = ViewerBackground.translucent.rawValue
+    @AppStorage(Prefs.Key.viewerOpacity) private var viewerOpacity = 0.78
+    @AppStorage(Prefs.Key.viewerFullScreen) private var viewerFullScreen = true
     @State private var ffmpegStatus = "Checking…"
     @State private var ffmpegFound = false
     @State private var cacheSize: Int64 = 0
@@ -30,6 +33,34 @@ struct SettingsView: View {
                 Text("Folders")
             } footer: {
                 Text("Deleting or favoriting moves the file into these folders. Pica remembers where each file came from, so you can restore it (R) or undo (⌘Z). Deleting something that's already in the Deleted folder moves it to the macOS Trash.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                Picker("Open photos", selection: $viewerFullScreen) {
+                    Text("Full screen").tag(true)
+                    Text("In the window").tag(false)
+                }
+                .pickerStyle(.segmented)
+                Picker("Background", selection: $viewerBackground) {
+                    ForEach(ViewerBackground.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                if viewerBackground != ViewerBackground.black.rawValue {
+                    Slider(value: $viewerOpacity, in: 0.3...0.95) {
+                        Text("Darkness")
+                    } minimumValueLabel: {
+                        Image(systemName: "sun.max")
+                    } maximumValueLabel: {
+                        Image(systemName: "moon.fill")
+                    }
+                }
+            } header: {
+                Text("Viewer")
+            } footer: {
+                Text(viewerFullScreen
+                     ? "Full screen covers the whole display; with Translucent or Blurred, everything on screen shows through behind the photo. The menu bar and Dock hide while it's open. Press Esc to close."
+                     : "The viewer opens inside Pica's window; with Translucent or Blurred, whatever is behind the window shows through.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -17,7 +17,7 @@ To make video formats that macOS can't play work, install ffmpeg (`brew install 
 
 - **Library sidebar**: add folders (or drop them on the window) and browse their subfolders. The sidebar also has **Favorites** and **Deleted** collections.
 - **Thumbnail grid**: thumbnails load asynchronously and are cached, with duration badges on videos. Filter by All / Photos / Videos, filter by name, sort by name, date, size or type, optionally include subfolders, and resize thumbnails. The folder refreshes on its own when files change on disk.
-- **Viewer**: fit / actual size / zoom (pinch, ⌘-scroll, double-click, `+` `-` `0` `1`), drag to pan, animated GIF/WebP/APNG, a filmstrip, and an info panel with EXIF (camera, lens, exposure, GPS) and video details. Neighbouring images are prefetched, so going next/previous is instant.
+- **Viewer**: like Picasa's photo viewer, it opens over the whole screen, with everything behind the photo dimmed and showing through. The menu bar and Dock hide; `Esc` closes it. In Settings you can choose Translucent, Blurred or Black and set how dark it is, or open the viewer inside the window instead. Also: fit / actual size / zoom (pinch, ⌘-scroll, double-click, `+` `-` `0` `1`), drag to pan, animated GIF/WebP/APNG, a filmstrip, and an info panel with EXIF (camera, lens, exposure, GPS) and video details. Neighbouring images are prefetched, so going next/previous is instant.
 - **Favorite** (`F`): moves the file to your Favorites folder. Pressing `F` on an item that's already a favorite moves it back where it came from.
 - **Delete** (`⌫`): moves the file to your Deleted folder. Deleting an item that's already in Deleted sends it to the macOS Trash, after asking first.
 - **Restore** (`R`) and **Undo** (`⌘Z`): Pica stores each moved file's original path in an extended attribute (`com.pica.origin`), so you can restore it later, even after relaunching.
@@ -46,7 +46,7 @@ Other video keys: `Space`/`K` play/pause, `,` `.` previous/next frame, `M` mute,
 |---|---|---|
 | Arrows | move selection (⇧ extends) | previous/next (hold ←/→ on video to scrub) |
 | `Return` / `Space` | open viewer | back to grid / play-pause or next |
-| `Esc` | clear selection | back to grid (or leave full screen) |
+| `Esc` | clear selection | close the viewer |
 | `F` | favorite / unfavorite | favorite / unfavorite |
 | `⌫` | move to Deleted | move to Deleted |
 | `R` | restore to original location | restore |
