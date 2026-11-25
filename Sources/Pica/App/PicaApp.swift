@@ -23,6 +23,11 @@ struct PicaApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Leftovers from a crash or force-quit. Runs before any file is opened.
+        Privacy.purge()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -39,8 +44,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task.detached(priority: .background) {
             _ = FFmpeg.path(for: "ffmpeg")
             _ = FFmpeg.path(for: "ffprobe")
-            FFmpeg.pruneConverted()
         }
+    }
+
+    /// Offers to empty the Deleted folder before quitting.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let mode = Prefs.emptyDeletedOnQuit
+        guard mode != .never, !DeletedFolderCleaner.isSystemQuit else { return .terminateNow }
+        let items = DeletedFolderCleaner.items(in: Library.shared.deletedFolder)
+        guard !items.isEmpty else { return .terminateNow }
+
+        if mode == .ask {
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.messageText = "Empty the Deleted folder before quitting?"
+            alert.informativeText = DeletedFolderCleaner.message(for: items)
+            alert.alertStyle = items.contains(where: \.isNetwork) ? .critical : .warning
+            let empty = alert.addButton(withTitle: "Empty and Quit")
+            empty.hasDestructiveAction = items.contains(where: \.isNetwork)
+            alert.addButton(withTitle: "Quit Without Emptying")
+            // Only offer Cancel if there's a window to go back to (closing the last window also quits).
+            if NSApp.windows.contains(where: { $0.isVisible && !($0 is NSPanel) }) {
+                alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+            }
+            alert.showsSuppressionButton = true
+            alert.suppressionButton?.title = "Do the same every time I quit"
+
+            let response = alert.runModal()
+            let remember = alert.suppressionButton?.state == .on
+            switch response {
+            case .alertFirstButtonReturn:
+                if remember { Prefs.emptyDeletedOnQuit = .always }
+            case .alertSecondButtonReturn:
+                if remember { Prefs.emptyDeletedOnQuit = .never }
+                return .terminateNow
+            default:
+                return .terminateCancel
+            }
+        }
+
+        Library.shared.video.stop()
+        Task.detached(priority: .userInitiated) {
+            let result = DeletedFolderCleaner.empty(items)
+            await MainActor.run {
+                if !result.failures.isEmpty {
+                    let alert = NSAlert()
+                    alert.messageText = "Some items couldn't be removed from the Deleted folder"
+                    alert.informativeText = result.failures.prefix(5).joined(separator: "\n")
+                        + (result.failures.count > 5 ? "\n…and \(result.failures.count - 5) more" : "")
+                    alert.addButton(withTitle: "Quit")
+                    alert.runModal()
+                }
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        return .terminateLater
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Library.shared.video.stop()
+        Privacy.purge()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

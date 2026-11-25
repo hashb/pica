@@ -599,5 +599,5 @@ final class Library {
         pb.writeObjects(actionTargets as [NSURL])
     }
 
-    static func count(_ n: Int) -> String { n == 1 ? "1 item" : "\(n) items" }
+    nonisolated static func count(_ n: Int) -> String { n == 1 ? "1 item" : "\(n) items" }
 }

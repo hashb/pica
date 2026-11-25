@@ -49,6 +49,14 @@ enum FFmpeg {
     private static let lock = NSLock()
     private static var resolved: [String: String?] = [:]
     private static var encoders: Set<String>?
+    /// ffmpeg/ffprobe processes currently running, so they can be stopped when Pica quits.
+    private static var running: Set<Process> = []
+
+    /// Stops any conversion or probe still running (child processes would otherwise outlive Pica).
+    static func terminateAll() {
+        let procs = lock.withLock { running }
+        for p in procs where p.isRunning { p.terminate() }
+    }
 
     static func resetCache() {
         lock.withLock {
@@ -160,6 +168,7 @@ enum FFmpeg {
                     collector.appendErr(d)
                 }
                 process.terminationHandler = { p in
+                    lock.withLock { _ = running.remove(p) }
                     outPipe.fileHandleForReading.readabilityHandler = nil
                     errPipe.fileHandleForReading.readabilityHandler = nil
                     collector.appendOut(outPipe.fileHandleForReading.readDataToEndOfFile())
@@ -167,8 +176,10 @@ enum FFmpeg {
                     cont.resume(returning: RunResult(status: p.terminationStatus, stdout: collector.out, stderr: collector.err))
                 }
                 do {
+                    lock.withLock { _ = running.insert(process) }
                     try process.run()
                 } catch {
+                    lock.withLock { _ = running.remove(process) }
                     process.terminationHandler = nil
                     cont.resume(throwing: error)
                 }
@@ -247,7 +258,8 @@ enum FFmpeg {
         try? FileManager.default.removeItem(at: cacheRoot)
     }
 
-    /// Keeps converted videos under ~20 GB by deleting the least recently used ones.
+    /// Keeps converted videos under ~20 GB by deleting the least recently used ones
+    /// (the whole cache is also removed when Pica quits).
     static func pruneConverted(limit: Int64 = 20 * 1024 * 1024 * 1024) {
         let dir = cacheDirectory("converted")
         let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey]
@@ -325,7 +337,8 @@ enum FFmpeg {
         return a
     }
 
-    /// Returns a cached MP4 that AVFoundation can play, remuxing (fast) or transcoding as needed.
+    /// Returns an MP4 that AVFoundation can play, remuxing (fast) or transcoding as needed.
+    /// It's cached for the rest of the session; the cache is deleted when Pica quits.
     static func makePlayable(_ url: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         let fm = FileManager.default
         let out = cacheDirectory("converted").appendingPathComponent(cacheKey(url) + ".mp4")

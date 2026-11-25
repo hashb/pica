@@ -20,13 +20,27 @@ To make video formats that macOS can't play work, install ffmpeg (`brew install 
 - **Viewer**: like Picasa's photo viewer, it opens over the whole screen, with everything behind the photo dimmed and showing through. The menu bar and Dock hide; `Esc` closes it. In Settings you can choose Translucent, Blurred or Black and set how dark it is, or open the viewer inside the window instead. Also: fit / actual size / zoom (pinch, ⌘-scroll, double-click, `+` `-` `0` `1`), drag to pan, animated GIF/WebP/APNG, a filmstrip, and an info panel with EXIF (camera, lens, exposure, GPS) and video details. Neighbouring images are prefetched, so going next/previous is instant.
 - **Favorite** (`F`): moves the file to your Favorites folder. Pressing `F` on an item that's already a favorite moves it back where it came from.
 - **Delete** (`⌫`): moves the file to your Deleted folder. Deleting an item that's already in Deleted sends it to the macOS Trash, after asking first.
+- **Empty Deleted on quit**: when you quit, Pica asks whether to empty the Deleted folder. Items on this Mac go to the macOS Trash. Items on network storage, which has no Trash, are deleted permanently, and the prompt warns about that. You can tick "Do the same every time", or pick Ask / Always empty / Never in Settings. Pica never asks when macOS is logging out or shutting down.
 - **Restore** (`R`) and **Undo** (`⌘Z`): Pica stores each moved file's original path in an extended attribute (`com.pica.origin`), so you can restore it later, even after relaunching.
   Default folders are `~/Pictures/Pica/Favorites` and `~/Pictures/Pica/Deleted`. You can change them in Settings (`⌘,`).
 
 ### Formats
 
 - **Images**: everything ImageIO decodes on your Mac, including JPEG, PNG, HEIC/HEIF, AVIF, WebP, JPEG XL, GIF, TIFF, BMP, PSD, ICO/ICNS, TGA, EXR, HDR, JPEG 2000, PBM/PGM/PPM and camera RAW (CR2/CR3, NEF, ARW, DNG, RAF, ORF, RW2…). SVG works through AppKit. Formats ImageIO can't read, such as QOI and PCX, fall back to ffmpeg.
-- **Videos**: MP4, MOV, M4V and 3GP play directly. MKV, WebM, AVI, WMV, FLV, MPEG-TS/MTS/M2TS, MPG, VOB, OGV, RMVB, DivX, MXF and others play through ffmpeg. If the streams are already H.264/HEVC, Pica remuxes the file, which takes seconds. Otherwise it transcodes with the VideoToolbox hardware encoder. Results are cached in `~/Library/Caches/Pica` (kept under 20 GB, clearable in Settings), so each file is converted only once.
+- **Videos**: MP4, MOV, M4V and 3GP play directly. MKV, WebM, AVI, WMV, FLV, MPEG-TS/MTS/M2TS, MPG, VOB, OGV, RMVB, DivX, MXF and others play through ffmpeg. If the streams are already H.264/HEVC, Pica remuxes the file, which takes seconds. Otherwise it transcodes with the VideoToolbox hardware encoder. Results are cached in `~/Library/Caches/Pica` while Pica is open, so going back to a video is instant. The cache is deleted when Pica quits.
+
+### Privacy
+
+Pica keeps no record of your files after it quits. When you quit, and again at launch in case it crashed or was force-quit, it:
+
+- deletes its cache (`~/Library/Caches/Pica`: converted videos, thumbnails, decoded images)
+- deletes its per-app system caches and any saved window state
+- stops any ffmpeg conversion still running
+- forgets the last folder shown in Open dialogs
+
+Thumbnails never go through Quick Look, whose cache is shared system-wide. Pica writes no logs.
+
+Pica does keep its settings, including the folders in the sidebar and the last folder you viewed. It also keeps the original location of each file it moves to Favorites or Deleted, stored on that file, so Restore works.
 
 ### Video scrubbing
 

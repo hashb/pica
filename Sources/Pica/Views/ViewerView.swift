@@ -92,6 +92,22 @@ struct ViewerView: View {
             }
             .help("Back to thumbnails (Esc)")
         }
+        ToolbarItem(placement: .navigation) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(library.currentItem?.name ?? "")
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if let i = library.currentIndex {
+                    Text("\(i + 1) of \(library.items.count)")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: 360, alignment: .leading)
+            .padding(.leading, 4)
+        }
         ToolbarItemGroup(placement: .primaryAction) {
             ControlGroup {
                 Button { library.step(-1) } label: { Label("Previous", systemImage: "chevron.left") }

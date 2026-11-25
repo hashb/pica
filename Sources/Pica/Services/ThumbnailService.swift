@@ -1,7 +1,6 @@
 import AppKit
 import AVFoundation
 import ImageIO
-import QuickLookThumbnailing
 
 struct Thumbnail {
     let image: NSImage
@@ -60,7 +59,7 @@ final class ThumbnailService: @unchecked Sendable {
         switch kind {
         case .image:
             if let cg = imageIOThumbnail(url, maxPixel) { return Thumbnail(image: NSImage(cgImage: cg, size: .zero), duration: nil) }
-            if let img = await quickLook(url, maxPixel) { return Thumbnail(image: img, duration: nil) }
+            if let img = appKitThumbnail(url, maxPixel) { return Thumbnail(image: img, duration: nil) }
             if let cg = await FFmpeg.extractFrame(url, at: nil, maxPixel: maxPixel, asPNG: true) {
                 return Thumbnail(image: NSImage(cgImage: cg, size: .zero), duration: nil)
             }
@@ -76,7 +75,6 @@ final class ThumbnailService: @unchecked Sendable {
             if let cg = await FFmpeg.extractFrame(url, at: at, maxPixel: maxPixel, asPNG: false) {
                 return Thumbnail(image: NSImage(cgImage: cg, size: .zero), duration: duration)
             }
-            if let img = await quickLook(url, maxPixel) { return Thumbnail(image: img, duration: duration) }
             return nil
         }
     }
@@ -113,11 +111,22 @@ final class ThumbnailService: @unchecked Sendable {
         return (r.image, duration)
     }
 
-    private static func quickLook(_ url: URL, _ maxPixel: Int) async -> NSImage? {
-        let side = CGFloat(maxPixel) / 2
-        let request = QLThumbnailGenerator.Request(
-            fileAt: url, size: CGSize(width: side, height: side), scale: 2, representationTypes: .thumbnail)
-        return try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
+    /// Formats only AppKit reads (e.g. SVG). Deliberately not Quick Look: its thumbnails
+    /// end up in a system-wide cache that Pica can't clear.
+    private static func appKitThumbnail(_ url: URL, _ maxPixel: Int) -> NSImage? {
+        guard let img = NSImage(contentsOf: url), img.isValid, img.size.width > 0, img.size.height > 0 else { return nil }
+        let scale = min(1, CGFloat(maxPixel) / max(img.size.width, img.size.height))
+        let size = NSSize(width: max(1, (img.size.width * scale).rounded()), height: max(1, (img.size.height * scale).rounded()))
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        img.draw(in: NSRect(origin: .zero, size: size))
+        NSGraphicsContext.restoreGraphicsState()
+        let out = NSImage(size: size)
+        out.addRepresentation(rep)
+        return out
     }
 }
 

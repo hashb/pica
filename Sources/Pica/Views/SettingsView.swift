@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.upscale) private var upscale = false
     @AppStorage(Prefs.Key.showNames) private var showNames = true
     @AppStorage(Prefs.Key.ffmpegPath) private var ffmpegPath = ""
+    @AppStorage(Prefs.Key.emptyDeletedOnQuit) private var emptyOnQuit = EmptyOnQuit.ask.rawValue
     @AppStorage(Prefs.Key.viewerBackground) private var viewerBackground = ViewerBackground.translucent.rawValue
     @AppStorage(Prefs.Key.viewerOpacity) private var viewerOpacity = 0.78
     @AppStorage(Prefs.Key.viewerFullScreen) private var viewerFullScreen = true
@@ -19,7 +20,7 @@ struct SettingsView: View {
             general.tabItem { Label("General", systemImage: "gearshape") }
             video.tabItem { Label("Video", systemImage: "film") }
         }
-        .frame(width: 580, height: 430)
+        .frame(width: 600, height: 640)
         .task { await refresh() }
     }
 
@@ -29,10 +30,13 @@ struct SettingsView: View {
             Section {
                 folderRow("Deleted items go to", url: library.deletedFolder) { library.deletedFolder = $0 }
                 folderRow("Favorites go to", url: library.favoritesFolder) { library.favoritesFolder = $0 }
+                Picker("Empty Deleted folder when quitting", selection: $emptyOnQuit) {
+                    ForEach(EmptyOnQuit.allCases) { Text($0.title).tag($0.rawValue) }
+                }
             } header: {
                 Text("Folders")
             } footer: {
-                Text("Deleting or favoriting moves the file into these folders. Pica remembers where each file came from, so you can restore it (R) or undo (⌘Z). Deleting something that's already in the Deleted folder moves it to the macOS Trash.")
+                Text("Deleting or favoriting moves the file into these folders. Pica remembers where each file came from, so you can restore it (R) or undo (⌘Z). Deleting something that's already in the Deleted folder moves it to the macOS Trash. When the Deleted folder is emptied on quit, items on this Mac go to the Trash; items on network storage have no Trash and are deleted permanently.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -98,7 +102,7 @@ struct SettingsView: View {
                     Button("Check Again") { Task { await refresh() } }
                 }
                 HStack {
-                    Text("Conversion & thumbnail cache: \(Format.bytes(cacheSize))")
+                    Text("Cache: \(Format.bytes(cacheSize)) — deleted when Pica quits")
                     Spacer()
                     Button("Clear Cache") {
                         FFmpeg.clearCache()
@@ -108,7 +112,7 @@ struct SettingsView: View {
             } header: {
                 Text("ffmpeg")
             } footer: {
-                Text("macOS plays MP4, MOV, M4V and 3GP itself. For MKV, WebM, AVI, WMV, FLV, MPEG-TS, OGV and others, Pica uses ffmpeg to remux or convert the file once and caches the result.")
+                Text("macOS plays MP4, MOV, M4V and 3GP itself. For MKV, WebM, AVI, WMV, FLV, MPEG-TS, OGV and others, Pica uses ffmpeg to remux or convert the file. Converted files and thumbnails are kept only while Pica is open and are deleted when it quits.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

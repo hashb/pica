@@ -24,6 +24,7 @@ enum Prefs {
         static let viewerBackground = "viewerBackground"
         static let viewerOpacity = "viewerBackgroundOpacity"
         static let viewerFullScreen = "viewerFullScreen"
+        static let emptyDeletedOnQuit = "emptyDeletedOnQuit"
     }
 
     static var d: UserDefaults { .standard }
@@ -42,6 +43,7 @@ enum Prefs {
             Key.viewerBackground: ViewerBackground.translucent.rawValue,
             Key.viewerOpacity: 0.78,
             Key.viewerFullScreen: true,
+            Key.emptyDeletedOnQuit: EmptyOnQuit.ask.rawValue,
         ])
     }
 
@@ -68,6 +70,10 @@ enum Prefs {
     }
     /// Open the viewer as a see-through overlay over the whole screen (otherwise inside the window).
     static var viewerFullScreen: Bool { d.bool(forKey: Key.viewerFullScreen) }
+    static var emptyDeletedOnQuit: EmptyOnQuit {
+        get { EmptyOnQuit(rawValue: d.string(forKey: Key.emptyDeletedOnQuit) ?? "") ?? .ask }
+        set { d.set(newValue.rawValue, forKey: Key.emptyDeletedOnQuit) }
+    }
     static var scrubBaseSpeed: Double { max(0.5, d.double(forKey: Key.scrubSpeed)) }
 }
 

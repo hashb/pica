@@ -7,6 +7,8 @@ struct ContentView: View {
     @State private var visibilityBeforeViewer: NavigationSplitViewVisibility = .all
     @AppStorage(Prefs.Key.viewerBackground) private var viewerBackground = ViewerBackground.translucent.rawValue
 
+    private var inWindowViewer: Bool { library.viewerOpen && !library.viewerInOverlay }
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
@@ -20,10 +22,13 @@ struct ContentView: View {
                 }
             }
         }
-        .navigationTitle(library.title)
-        .navigationSubtitle(library.subtitle)
+        // While the in-window viewer is open it shows its own (light) title in the toolbar.
+        .navigationTitle(inWindowViewer ? "" : library.title)
+        .navigationSubtitle(inWindowViewer ? "" : library.subtitle)
         .background(WindowAccessor { window in
             KeyboardRouter.shared.mainWindow = window
+            // Don't let macOS save window state (it can include what was on screen).
+            window.isRestorable = false
             updateWindowTranslucency()
         })
         .overlay(alignment: library.viewerOpen ? .top : .bottom) {
@@ -66,6 +71,11 @@ struct ContentView: View {
         let seeThrough = library.viewerOpen && !library.viewerInOverlay && (ViewerBackground(rawValue: viewerBackground) ?? .translucent).seeThrough
         window.isOpaque = !seeThrough
         window.backgroundColor = seeThrough ? .clear : .windowBackgroundColor
+        // The viewer is dark, so the toolbar needs light text and icons while it's open.
+        let inWindowViewer = library.viewerOpen && !library.viewerInOverlay
+        window.appearance = inWindowViewer ? NSAppearance(named: .darkAqua) : nil
+        // The system title doesn't stay readable over the see-through viewer; the viewer shows its own.
+        window.titleVisibility = inWindowViewer ? .hidden : .visible
     }
 }
 
@@ -77,8 +87,10 @@ private struct ViewerToolbarStyle: ViewModifier {
         if #available(macOS 15.0, *) {
             content
                 .toolbarBackgroundVisibility(viewerOpen ? .hidden : .automatic, for: .windowToolbar)
+                .toolbarColorScheme(viewerOpen ? .dark : nil, for: .windowToolbar)
         } else {
             content
+                .toolbarColorScheme(viewerOpen ? .dark : nil, for: .windowToolbar)
         }
     }
 }

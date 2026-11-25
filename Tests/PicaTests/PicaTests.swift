@@ -147,3 +147,80 @@ final class FFmpegTests: XCTestCase {
         XCTAssertEqual(thumb?.duration ?? 0, 2, accuracy: 0.2)
     }
 }
+
+final class PrivacyTests: XCTestCase {
+    func testPurgeRemovesCachesAndPanelHistory() throws {
+        let fm = FileManager.default
+        let root = Fixtures.dir.appendingPathComponent("privacy", isDirectory: true)
+        try? fm.removeItem(at: root)
+        let cache = root.appendingPathComponent("Caches/Pica", isDirectory: true)
+        let library = root.appendingPathComponent("Library", isDirectory: true)
+        let bundleID = "local.pica.viewer.purgetest"
+        let leftovers = [
+            cache.appendingPathComponent("converted/a.mp4"),
+            cache.appendingPathComponent("thumbs/b.jpg"),
+            library.appendingPathComponent("Caches/\(bundleID)/x"),
+            library.appendingPathComponent("Saved Application State/\(bundleID).savedState/data.data"),
+            library.appendingPathComponent("Logs/Pica/log.txt"),
+        ]
+        for f in leftovers {
+            try fm.createDirectory(at: f.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data([1]).write(to: f)
+        }
+        let keep = library.appendingPathComponent("Caches/some.other.app/x")
+        try fm.createDirectory(at: keep.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data([1]).write(to: keep)
+
+        Privacy.purge(bundleID: bundleID, cacheRoot: cache, library: library)
+
+        XCTAssertFalse(fm.fileExists(atPath: cache.path))
+        for f in leftovers { XCTAssertFalse(fm.fileExists(atPath: f.path), f.path) }
+        XCTAssertTrue(fm.fileExists(atPath: keep.path), "must not touch other apps")
+    }
+
+    func testTerminateAllStopsRunningFFmpeg() async throws {
+        guard let ffmpeg = FFmpeg.path(for: "ffmpeg") else { throw XCTSkip("ffmpeg not installed") }
+        let task = Task {
+            try await FFmpeg.run(ffmpeg, ["-v", "error", "-re", "-f", "lavfi", "-i", "testsrc", "-t", "60", "-f", "null", "-"])
+        }
+        try await Task.sleep(for: .milliseconds(500))
+        let start = Date()
+        FFmpeg.terminateAll()
+        let result = try await task.value
+        XCTAssertNotEqual(result.status, 0)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 3)
+    }
+}
+
+final class EmptyDeletedTests: XCTestCase {
+    func testNetworkItemsArePermanentlyDeletedAndMessageWarns() throws {
+        let fm = FileManager.default
+        let dir = Fixtures.dir.appendingPathComponent("deleted", isDirectory: true)
+        try? fm.removeItem(at: dir)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 2048).write(to: dir.appendingPathComponent("a.jpg"))
+        try fm.createDirectory(at: dir.appendingPathComponent("folder"), withIntermediateDirectories: true)
+        try Data([1]).write(to: dir.appendingPathComponent("folder/b.jpg"))
+        try Data([1]).write(to: dir.appendingPathComponent(".DS_Store"))
+
+        let found = DeletedFolderCleaner.items(in: dir)
+        XCTAssertEqual(Set(found.map(\.url.lastPathComponent)), ["a.jpg", "folder"], "hidden files are skipped")
+        XCTAssertTrue(found.allSatisfy { !$0.isNetwork }, "temp dir is on a local volume")
+        XCTAssertTrue(DeletedFolderCleaner.message(for: found).contains("moved to the Trash"))
+        XCTAssertFalse(DeletedFolderCleaner.message(for: found).contains("permanently"))
+
+        // Pretend they're on network storage: they must be removed outright, not trashed.
+        let network = found.map { DeletedFolderCleaner.Item(url: $0.url, isNetwork: true, size: $0.size) }
+        XCTAssertTrue(DeletedFolderCleaner.message(for: network).contains("deleted permanently"))
+        let result = DeletedFolderCleaner.empty(network)
+        XCTAssertEqual(result.removed, 2)
+        XCTAssertEqual(result.trashed, 0)
+        XCTAssertTrue(result.failures.isEmpty)
+        XCTAssertFalse(fm.fileExists(atPath: dir.appendingPathComponent("a.jpg").path))
+        XCTAssertFalse(fm.fileExists(atPath: dir.appendingPathComponent("folder").path))
+
+        let mixed = [found[0], network[1]]
+        let msg = DeletedFolderCleaner.message(for: mixed)
+        XCTAssertTrue(msg.contains("1 item will be moved to the Trash") && msg.contains("deleted permanently"), msg)
+    }
+}

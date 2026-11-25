@@ -53,7 +53,7 @@ struct VideoStage: View {
                     .font(.headline)
                 ProgressView(value: p)
                     .frame(width: 240)
-                Text(p > 0 ? "\(Int(p * 100))% · converted once, then cached" : "Starting ffmpeg…")
+                Text(p > 0 ? "\(Int(p * 100))% · kept until Pica quits" : "Starting ffmpeg…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
