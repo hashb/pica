@@ -3,9 +3,15 @@ import SwiftUI
 struct VideoStage: View {
     let item: MediaItem
     @Bindable var controller: VideoPlayerController
+
+    /// How long the pointer must be still (and off the controls) before the controls fade.
+    static let idleDelay: TimeInterval = 2.5
+
     @State private var controlsVisible = true
-    @State private var hoveringControls = false
-    @State private var hideTask: Task<Void, Never>?
+    @State private var lastActivity = Date()
+    @State private var lastMouse: CGPoint?
+    @State private var controlsFrame: CGRect = .zero
+    @State private var window: NSWindow?
 
     var body: some View {
         ZStack {
@@ -22,24 +28,73 @@ struct VideoStage: View {
                 )
 
             statusOverlay
-
+        }
+        .overlay(alignment: .topLeading) {
             if controller.isScrubbing {
                 ScrubHUD(controller: controller)
+                    .padding(14)
                     .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.15), value: controller.isScrubbing)
         .overlay(alignment: .bottom) {
             VideoControls(controller: controller)
-                .onHover { hoveringControls = $0; poke() }
-                .opacity(controlsVisible || !controller.isPlaying || controller.isScrubbing ? 1 : 0)
-                .animation(.easeInOut(duration: 0.2), value: controlsVisible)
+                .background(GeometryReader { geo in
+                    Color.clear
+                        .onAppear { controlsFrame = geo.frame(in: .global) }
+                        .onChange(of: geo.frame(in: .global)) { _, f in controlsFrame = f }
+                })
+                .opacity(showControls ? 1 : 0)
+                .allowsHitTesting(showControls)
+                .animation(.easeInOut(duration: 0.35), value: showControls)
                 .disabled(!controller.isReady)
         }
-        .onContinuousHover { phase in
-            if case .active = phase { poke() }
+        .background(WindowAccessor { window = $0 })
+        .onChange(of: controller.isPlaying) { noteActivity() }
+        .onChange(of: controller.isScrubbing) { noteActivity() }
+        .task {
+            // Watch the real pointer position rather than SwiftUI hover callbacks, which also
+            // fire when the view redraws (the time label updates many times a second).
+            noteActivity()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(150))
+                checkPointer()
+            }
         }
-        .onChange(of: controller.isPlaying) { poke() }
-        .onAppear { poke() }
+    }
+
+    private var showControls: Bool {
+        controlsVisible || !controller.isPlaying || controller.isScrubbing
+    }
+
+    private func noteActivity() {
+        lastActivity = Date()
+        if !controlsVisible { controlsVisible = true }
+    }
+
+    private func checkPointer() {
+        let mouse = NSEvent.mouseLocation
+        defer { lastMouse = mouse }
+        let moved = lastMouse.map { hypot($0.x - mouse.x, $0.y - mouse.y) > 2 } ?? false
+        if moved || isOverControls(mouse) {
+            noteActivity()
+            return
+        }
+        guard controlsVisible, controller.isPlaying, !controller.isScrubbing,
+              Date().timeIntervalSince(lastActivity) > Self.idleDelay else { return }
+        controlsVisible = false
+        if let window, window.isKeyWindow, window.frame.contains(mouse) {
+            NSCursor.setHiddenUntilMouseMoves(true)
+        }
+    }
+
+    /// Whether the pointer (in screen coordinates) is over the control bar.
+    private func isOverControls(_ screenPoint: CGPoint) -> Bool {
+        guard let window, let content = window.contentView, controlsFrame.width > 0 else { return false }
+        let inWindow = window.convertPoint(fromScreen: screenPoint)
+        var p = content.convert(inWindow, from: nil)
+        if !content.isFlipped { p.y = content.bounds.height - p.y }   // SwiftUI's global space is top-down
+        return controlsFrame.insetBy(dx: -8, dy: -8).contains(p)
     }
 
     @ViewBuilder
@@ -73,38 +128,28 @@ struct VideoStage: View {
         }
     }
 
-    private func poke() {
-        controlsVisible = true
-        hideTask?.cancel()
-        hideTask = Task {
-            try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled, controller.isPlaying, !hoveringControls, !controller.isScrubbing else { return }
-            controlsVisible = false
-            NSCursor.setHiddenUntilMouseMoves(true)
-        }
-    }
 }
 
-/// Big centred indicator while scrubbing: direction, speed and position.
+/// Small corner notice while scrubbing: direction, speed and position.
 struct ScrubHUD: View {
     let controller: VideoPlayerController
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: controller.scrubDirection < 0 ? "backward.fill" : "forward.fill")
-                Text(speedText).monospacedDigit()
-            }
-            .font(.system(size: 30, weight: .bold))
-            Text("\(Format.duration(controller.currentTime)) / \(Format.duration(controller.duration))")
-                .font(.system(size: 15, weight: .medium))
+        HStack(spacing: 8) {
+            Image(systemName: controller.scrubDirection < 0 ? "backward.fill" : "forward.fill")
+                .font(.system(size: 12, weight: .bold))
+            Text(speedText)
+                .font(.system(size: 14, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(.white.opacity(0.8))
+            Text("\(Format.duration(controller.currentTime)) / \(Format.duration(controller.duration))")
+                .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.75))
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 22)
-        .padding(.vertical, 14)
-        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.black.opacity(0.55), in: Capsule())
         .allowsHitTesting(false)
     }
 
